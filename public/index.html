@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kimizo Admin</title>
+<meta name="robots" content="noindex,nofollow">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--red:#D8141C;--bg:#f7f1ee;--card:#fff;--ink:#1d1416;--mute:#6f6366;--line:#eadcd6;--tint:#fde9e6}
+@media(prefers-color-scheme:dark){:root{--bg:#181012;--card:#241a1d;--ink:#f6ecea;--mute:#b3a3a6;--line:#3a2a2e;--tint:#3a1c1f}}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'DM Sans',system-ui,sans-serif}
+.logo{font-family:'Archivo Black',Impact,sans-serif;color:var(--red);font-size:26px;letter-spacing:-1px}
+input,select,textarea,button{font:inherit}
+input,select,textarea{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+label{display:block;font-size:13px;color:var(--mute);margin:10px 0 4px}
+.btn{background:var(--red);color:#fff;border:0;padding:10px 18px;border-radius:8px;font-weight:700;cursor:pointer}
+.btn.o{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.s{padding:5px 12px;font-size:13px}
+#login{max-width:360px;margin:15vh auto;background:var(--card);padding:28px;border-radius:16px;border:1px solid var(--line)}
+#err{color:var(--red);font-size:14px;min-height:20px}
+header{background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:16px;padding:10px 4vw;flex-wrap:wrap}
+header a{color:var(--mute);font-size:14px}
+.tabs{display:flex;gap:6px;margin-left:auto}
+.tabs button{border:0;background:none;color:var(--ink);padding:8px 16px;border-radius:99px;cursor:pointer;font-weight:500}
+.tabs button.on{background:var(--red);color:#fff}
+main{max-width:1000px;margin:20px auto;padding:0 4vw}
+.box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:18px}
+.box h2{margin:0 0 6px;font-size:18px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 14px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+.th{width:44px;height:44px;border-radius:8px;background:var(--tint);display:grid;place-items:center;font-size:24px;overflow:hidden}.th img{width:100%;height:100%;object-fit:cover}
+.ord{border-bottom:1px solid var(--line);padding:12px 0;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;font-size:14px}
+.ord small{color:var(--mute)}
+.tw{overflow-x:auto}
+.chk{display:flex;gap:8px;align-items:center;margin:0;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-size:14px;cursor:pointer}.chk input{width:auto}
+.chip{display:inline-block;margin:0 0 0 6px;padding:1px 8px;border-radius:99px;font-size:11px;font-weight:700;vertical-align:middle}
+.chip.soon{background:#fde9e6;color:#B5120F}.chip.nw{background:#fff1b8;color:#7a5b00}.chip.out{background:#eee;color:#555}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:99px;font-size:14px}
+@media(max-width:700px){.g2,.g3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="app" hidden>
+<header>
+  <span class="logo">kimizo admin</span><a href="#" id="viewstore" target="_blank" rel="noopener">View store</a>
+  <div class="tabs" id="tabs">
+    <button data-t="products" class="on">Products</button><button data-t="orders">Orders</button><button data-t="reviews">Reviews</button><button data-t="prebooks">Pre-bookings</button><button data-t="settings">Settings</button><button data-t="out">Log out</button>
+  </div>
+</header>
+<main>
+<section id="t-products">
+  <div class="box">
+    <h2 id="ftitle">Add new product</h2>
+    <input type="hidden" id="pid">
+    <div class="g3">
+      <div><label>Product name *</label><input id="pn"></div>
+      <div><label>Category *</label><input id="pc" list="cats" placeholder="Toy Cars"><datalist id="cats"></datalist></div>
+      <div><label>Type (sub-category)</label><input id="ps" list="subsl" placeholder="SUV, Sedan, Sports..."><datalist id="subsl"></datalist></div>
+    </div>
+    <div class="g3">
+      <div><label>Origin *</label><select id="po"><option>Japan</option><option>Korea</option><option>China</option></select></div>
+      <div><label>Selling price ₹ * <small style="color:var(--mute)">(can stay empty for Coming soon)</small></label><input id="pp" type="number" min="1"></div>
+      <div><label>MRP ₹ (cut price)</label><input id="pm" type="number" min="1"></div>
+    </div>
+    <div class="g3">
+      <div><label>Emoji (used if no image)</label><input id="pe" placeholder="🎧"></div>
+      <div><label>Shipping ₹ per item (blank = store default)</label><input id="psh" type="number" min="0" step="1" placeholder="e.g. 60 (0 = free)"></div>
+      <div><label>Product image (optional)</label>
+        <input id="pf" type="file" accept="image/*">
+        <input type="hidden" id="pi">
+        <div id="prev" style="margin-top:8px;display:flex;align-items:center;gap:10px" hidden>
+          <div class="th" style="width:60px;height:60px"><img id="pimg" alt="Preview"></div>
+          <button type="button" class="btn o s" id="prm">Remove image</button>
+        </div>
+      </div>
+    </div>
+    <div class="g3">
+      <div><label>Stock quantity (blank = don't track)</label><input id="pst" type="number" min="0" step="1" placeholder="e.g. 25"></div>
+      <div><label>Status</label><label class="chk"><input id="psoon" type="checkbox"> Coming soon (customers can Pre-book, but cannot buy)</label><small style="color:var(--mute)">Untick it later to launch: pre-booked customers are notified automatically.</small></div>
+      <div><label>Badge</label><label class="chk"><input id="pnw" type="checkbox"> Always show NEW badge</label><small style="color:var(--mute)">New products get the NEW badge automatically for 14 days.</small></div>
+    </div>
+    <label>More photos (optional · up to 5 · shown as a gallery on the product page)</label>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <input id="pxf" type="file" accept="image/*" multiple style="width:auto;max-width:100%">
+      <div id="pxl" style="display:flex;gap:12px;flex-wrap:wrap"></div>
+    </div>
+    <label>Product description (shown on the product page; new line = new line)</label>
+    <textarea id="pd" rows="4" maxlength="2000" placeholder="Material, size, what's in the box, how to use..."></textarea>
+    <p style="margin:14px 0 0"><button class="btn" id="save">Add product</button> <button class="btn o" id="cancel" hidden>Cancel edit</button></p>
+  </div>
+  <div id="plists">
+    <div class="box tw" id="bxNew"><h2>🆕 New products (<span id="ncount">0</span>)</h2>
+      <table><thead><tr><th></th><th>Name</th><th>Category</th><th>Origin</th><th>Price</th><th>Shipping</th><th>Stock</th><th></th></tr></thead><tbody id="plistNew"></tbody></table></div>
+    <div class="box tw"><h2>All products (<span id="pcount">0</span>)</h2>
+      <table><thead><tr><th></th><th>Name</th><th>Category</th><th>Origin</th><th>Price</th><th>Shipping</th><th>Stock</th><th></th></tr></thead><tbody id="plist"></tbody></table></div>
+    <div class="box tw"><h2>⏳ Coming soon (<span id="scount">0</span>)</h2>
+      <table><thead><tr><th></th><th>Name</th><th>Category</th><th>Origin</th><th>Price</th><th>Shipping</th><th>Stock</th><th></th></tr></thead><tbody id="plistSoon"></tbody></table></div>
+  </div>
+</section>
+
+<section id="t-orders" hidden><div class="box"><h2>Orders</h2><div id="olist"></div></div></section>
+
+<section id="t-prebooks" hidden>
+  <div class="box tw"><h2>Pre-booking summary</h2>
+    <small style="color:var(--mute)">When you untick "Coming soon" on a product, everyone who pre-booked it is notified automatically (bell in the store header, plus e-mail if e-mail is set up).</small>
+    <table style="margin-top:8px"><thead><tr><th>Product</th><th>Customers</th><th>Total qty</th><th>Status</th><th></th></tr></thead><tbody id="pbsum"></tbody></table></div>
+  <div class="box tw"><h2>All pre-bookings (<span id="pbcount">0</span>) <button class="btn o s" id="pbcsv" style="float:right">⬇ Export CSV</button></h2>
+    <table><thead><tr><th>Customer</th><th>Phone</th><th>Email</th><th>Product</th><th>Qty</th><th>Date</th><th>Status</th><th></th></tr></thead><tbody id="pblist"></tbody></table></div>
+</section>
+
+<section id="t-reviews" hidden><div class="box"><h2>Customer reviews</h2><div id="rvlist"></div></div></section>
+
+<section id="t-settings" hidden>
+<div class="box">
+  <h2>Store settings</h2>
+  <div class="g2">
+    <div><label>Store name</label><input id="s_storeName"></div>
+    <div><label>Tagline</label><input id="s_tagline"></div>
+  </div>
+  <label>Homepage headline</label><input id="s_heroTitle">
+  <label>Homepage description</label><textarea id="s_heroText" rows="2"></textarea>
+  <label>Announcement bar (leave empty to hide)</label><input id="s_announcement" placeholder="Diwali sale! Extra 10% off">
+  <div class="g2">
+    <div><label>Contact phone</label><input id="s_phone"></div>
+    <div><label>Contact email</label><input id="s_email"></div>
+    <div><label>Default shipping fee ₹ (per order, for products without their own shipping)</label><input id="s_shippingFee" type="number" min="0"></div>
+    <div><label>Free shipping above ₹ (0 = never free)</label><input id="s_freeAbove" type="number" min="0"></div>
+  </div>
+  <p style="margin:14px 0 0"><button class="btn" id="ssave">Save settings</button></p>
+</div>
+
+<div class="box">
+  <h2>Print label details</h2>
+  <small style="color:var(--mute)">Shipping label-la "If undelivered, return to" and "Sold by" idhula irundhu varum. Intha browser-la mattum save aagum.</small>
+  <div class="g2">
+    <div><label>Seller / shop name</label><input id="pl_name" placeholder="Kimizo"></div>
+    <div><label>Phone</label><input id="pl_phone" placeholder="98765 43210"></div>
+  </div>
+  <label>Return address</label><textarea id="pl_addr" rows="3" placeholder="Shop no, street, city, state, PIN"></textarea>
+  <label>GSTIN (optional)</label><input id="pl_gstin">
+  <p style="margin:14px 0 0"><button class="btn" id="plsave">Save label details</button></p>
+</div>
+</section>
+</main>
+</div>
+<div id="toast" hidden></div>
+
+<script src="config.js"></script>
+<script>
+const API=((window.KZ&&window.KZ.API)||'').replace(/\/$/,'');          // address of the store server (set in config.js)
+const A=u=>u&&String(u).startsWith('/')?API+u:u;                          // pictures are saved as /api/img/... on the store server
+const TOKEN=localStorage.getItem('kza_token')||'';let PR=[],PX=[];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const inr=n=>'₹'+Number(n).toLocaleString('en-IN');
+const SK=['storeName','tagline','heroTitle','heroText','announcement','phone','email','shippingFee','freeAbove'];
+function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toast.x);toast.x=setTimeout(()=>t.hidden=true,2000)}
+async function api(url,method='GET',body){
+  const r=await fetch(API+url,{method,headers:{'Content-Type':'application/json',Authorization:'Bearer '+TOKEN},body:body?JSON.stringify(body):undefined});
+  const d=await r.json().catch(()=>({}));
+  if((r.status===401||r.status===403)&&url!=='/api/admin/check')bye();
+  if(!r.ok)throw new Error(d.error||'Something went wrong');
+  return d;
+}
+function bye(){localStorage.removeItem('kza_token');localStorage.removeItem('kza_user');location.href='/login.html'}
+const vs=document.getElementById('viewstore');if(vs)vs.href=(window.KZ&&window.KZ.STORE)||API||'/';
+(async()=>{try{await api('/api/admin/check');$('app').hidden=false;loadProducts();loadSettings();loadSeller()}catch{bye()}})();
+
+$('tabs').onclick=e=>{
+  const t=e.target.dataset.t;if(!t)return;
+  if(t==='out'){bye();return}
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  ['products','orders','reviews','prebooks','settings'].forEach(x=>$('t-'+x).hidden=x!==t);
+  if(t==='orders')loadOrders();
+  if(t==='reviews')loadReviews();
+  if(t==='prebooks')loadPrebooks();
+};
+
+/* Image upload */
+function showPrev(u){$('pi').value=u||'';$('prev').hidden=!u;if(u)$('pimg').src=A(u);$('pf').value=''}
+$('prm').onclick=()=>showPrev('');
+/* Convert ANY image the browser can open (PNG, JPG, WEBP, AVIF, GIF, BMP, SVG, HEIC on iPhone/Safari...) to a small WEBP (max 1000px, ~300 KB) before upload */
+async function prepImage(f){
+  if(f.type==='image/gif'&&f.size<=1024*1024)return f; // keep small animated GIFs as they are
+  const img=await new Promise((ok,no)=>{const i=new Image();const u=URL.createObjectURL(f);i.onload=()=>{URL.revokeObjectURL(u);ok(i)};i.onerror=()=>{URL.revokeObjectURL(u);no(new Error("Your browser can't open this image format. Please convert it to JPG or PNG and try again."))};i.src=u});
+  const w0=img.naturalWidth||800,h0=img.naturalHeight||800,k=Math.min(1,1000/Math.max(w0,h0));
+  const c=document.createElement('canvas');c.width=Math.max(1,Math.round(w0*k));c.height=Math.max(1,Math.round(h0*k));
+  const x=c.getContext('2d');x.drawImage(img,0,0,c.width,c.height);
+  const to=(t,q)=>new Promise(r=>c.toBlob(r,t,q));
+  let blob=null;
+  for(const q of [.85,.75,.65,.5,.4]){blob=await to('image/webp',q);if(!blob||blob.type!=='image/webp')break;if(blob.size<=300*1024)break}
+  if(!blob||blob.type!=='image/webp'){ // very old browsers without WEBP export: use JPEG on a white background
+    x.globalCompositeOperation='destination-over';x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
+    for(const q of [.85,.7,.55,.4]){blob=await to('image/jpeg',q);if(blob&&blob.size<=300*1024)break}
+  }
+  if(!blob)throw new Error('Could not process this image');
+  return blob;
+}
+$('pf').onchange=async()=>{
+  const f=$('pf').files[0];if(!f)return;
+  if(f.size>25*1024*1024){toast('Image must be under 25 MB');$('pf').value='';return}
+  toast('Uploading...');
+  try{
+    const blob=await prepImage(f);
+    if(blob.size>1.4*1024*1024)throw new Error('Image is too large even after compression');
+    const r=await fetch(API+'/api/upload',{method:'POST',headers:{'Content-Type':blob.type,Authorization:'Bearer '+TOKEN},body:blob});
+    const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Upload failed');
+    showPrev(d.url);toast('Image uploaded');
+  }catch(e){toast(e.message);$('pf').value=''}
+};
+
+async function uploadImg(f){
+  if(f.size>25*1024*1024)throw new Error('Image must be under 25 MB');
+  const blob=await prepImage(f);
+  if(blob.size>1.4*1024*1024)throw new Error('Image is too large even after compression');
+  const r=await fetch(API+'/api/upload',{method:'POST',headers:{'Content-Type':blob.type,Authorization:'Bearer '+TOKEN},body:blob});
+  const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Upload failed');
+  return d.url;
+}
+/* Extra photos (gallery) */
+function drawPX(){$('pxl').innerHTML=PX.map((u,i)=>`<div style="position:relative"><div class="th" style="width:60px;height:60px"><img src="${esc(A(u))}" alt=""></div><button type="button" class="btn s" data-pxrm="${i}" aria-label="Remove photo" style="position:absolute;top:-8px;right:-8px;padding:0;width:22px;height:22px;border-radius:50%;line-height:1">✕</button></div>`).join('')}
+$('pxl').onclick=e=>{const i=e.target.dataset.pxrm;if(i!==undefined){PX.splice(+i,1);drawPX()}};
+$('pxf').onchange=async()=>{
+  const files=[...$('pxf').files];$('pxf').value='';
+  const room=5-PX.length;if(room<=0){toast('Maximum 5 extra photos');return}
+  toast('Uploading...');
+  try{for(const f of files.slice(0,room)){PX.push(await uploadImg(f));drawPX()}toast('Photos uploaded')}
+  catch(e){toast(e.message)}
+};
+
+/* Products */
+const isNewP=p=>!p.soon&&(!!p.nw||(p.createdAt&&Date.now()-new Date(p.createdAt)<14*864e5));
+const chips=p=>(p.soon?'<span class="chip soon">Coming soon</span>':(p.stock!=null&&p.stock<=0?'<span class="chip out">Sold out</span>':''))+(isNewP(p)?'<span class="chip nw">NEW</span>':'');
+const stockCell=p=>p.stock==null?'<small style="color:var(--mute)">not tracked</small>':(p.stock<=0?'<b style="color:#B5120F">0</b>':(p.stock<=5?'<b style="color:#c25b00">'+p.stock+' (low)</b>':String(p.stock)));
+async function loadProducts(){
+  PR=await api('/api/products');
+  $('subsl').innerHTML=[...new Set(PR.map(p=>p.sub).filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('');
+  $('cats').innerHTML=[...new Set(PR.map(p=>p.c))].map(c=>`<option value="${esc(c)}">`).join('');
+  const row=p=>`<tr><td><div class="th">${p.img?`<img src="${esc(A(p.img))}" alt="">`:esc(p.e)}</div></td><td>${esc(p.n)}${chips(p)}</td><td>${esc(p.c)}${p.sub?' · '+esc(p.sub):''}</td><td>${esc(p.o)}</td><td>${p.p>0?inr(p.p):'<small style="color:var(--mute)">no price</small>'}${p.p>0&&p.m>p.p?` <small style="color:var(--mute)"><s>${inr(p.m)}</s></small>`:''}</td><td>${p.ship==null||p.ship===''?'<small style="color:var(--mute)">default</small>':(Number(p.ship)>0?inr(p.ship):'Free')}</td><td>${stockCell(p)}</td><td style="white-space:nowrap"><button class="btn o s" data-edit="${p.id}">Edit</button> <button class="btn o s" data-del="${p.id}">Delete</button></td></tr>`;
+  const byNew=(a,b)=>(+b.id||0)-(+a.id||0), sorted=[...PR].sort(byNew);
+  const fill=(id,list,msg)=>{$(id).innerHTML=list.map(row).join('')||'<tr><td colspan="8" style="color:var(--mute)">'+msg+'</td></tr>'};
+  const nw=sorted.filter(isNewP), live=sorted.filter(p=>!p.soon), soon=sorted.filter(p=>p.soon);
+  $('ncount').textContent=nw.length;$('pcount').textContent=live.length;$('scount').textContent=soon.length;
+  $('bxNew').hidden=!nw.length;
+  fill('plistNew',nw,'');fill('plist',live,'No products yet.');fill('plistSoon',soon,'No coming soon products. Tick "Coming soon" on a product to add one here.');
+}
+function resetForm(){['pid','pn','pc','ps','pp','pm','pe','psh','pi','pd'].forEach(i=>$(i).value='');$('ftitle').textContent='Add new product';$('save').textContent='Add product';$('cancel').hidden=true;showPrev('');PX=[];drawPX();$('pst').value='';$('psoon').checked=false;$('pnw').checked=false}
+$('cancel').onclick=resetForm;
+$('save').onclick=async()=>{
+  const id=$('pid').value,b={n:$('pn').value,c:$('pc').value,sub:$('ps').value,o:$('po').value,p:$('pp').value,m:$('pm').value||$('pp').value,e:$('pe').value||'📦',ship:$('psh').value,img:$('pi').value,imgs:PX,stock:$('pst').value,soon:$('psoon').checked,nw:$('pnw').checked,desc:$('pd').value};
+  try{const d=await api(id?'/api/products/'+id:'/api/products',id?'PUT':'POST',b);toast(id?('Product updated'+(d&&d.notified?' · '+d.notified+' pre-booked customer'+(d.notified>1?'s':'')+' notified 🔔':'')):'Product added');resetForm();loadProducts()}
+  catch(e){toast(e.message)}
+};
+$('plists').onclick=async e=>{
+  const ed=e.target.dataset.edit,dl=e.target.dataset.del;
+  if(ed){const p=PR.find(x=>x.id==ed);$('pid').value=p.id;$('pn').value=p.n;$('pc').value=p.c;$('ps').value=p.sub||'';$('po').value=p.o;$('pp').value=p.p;$('pm').value=p.m;$('pe').value=p.e;$('psh').value=p.ship==null?'':p.ship;$('pd').value=p.desc||'';showPrev(p.img);PX=Array.isArray(p.imgs)?[...p.imgs]:[];drawPX();$('pst').value=p.stock==null?'':p.stock;$('psoon').checked=!!p.soon;$('pnw').checked=!!p.nw;$('ftitle').textContent='Edit product';$('save').textContent='Update product';$('cancel').hidden=false;scrollTo({top:0,behavior:'smooth'})}
+  if(dl&&confirm('Delete this product?')){try{await api('/api/products/'+dl,'DELETE');toast('Product deleted');loadProducts()}catch(x){toast(x.message)}}
+};
+
+/* Orders */
+const isPaid=o=>o.payment&&o.payment.status==='paid';
+const shipBox=o=>`<div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);display:flex;gap:6px;align-items:center;justify-content:flex-end;flex-wrap:wrap">
+  <span style="font-size:13px;color:var(--mute);white-space:nowrap">Shipping ₹</span>
+  <input type="number" min="0" step="1" data-ship="${o.id}" value="${Number(o.shipping||0)}" style="width:90px"${isPaid(o)?' disabled':''}>
+  <button class="btn o s" data-saveship="${o.id}"${isPaid(o)?' disabled':''}>Save shipping</button>
+  ${isPaid(o)?'<small style="width:100%">Locked – customer already paid online</small>':''}</div>`;
+async function loadOrders(){
+  const O=await api('/api/orders');
+  window.OD=O;
+  $('olist').innerHTML=O.map(o=>{const last=(o.history||[]).slice(-1)[0];return `<div class="ord"><div><b>#${o.id}</b> · ${esc(o.name)} · ${esc(o.phone)}<br><small>${esc(o.address)}</small><br><small>${o.items.map(i=>esc(i.name)+' × '+i.qty).join(', ')}</small><br><small>${new Date(o.createdAt).toLocaleString('en-IN')}</small><br><small>Last update: ${last?esc(last.note||last.status)+' · '+new Date(last.at).toLocaleString('en-IN'):'-'}</small></div><div style="text-align:right;min-width:240px"><b>${inr(o.total)}</b> <small>(shipping ${inr(o.shipping||0)})</small><br><small style="color:${o.payment&&o.payment.status==='paid'?'#2FBF71':'var(--mute)'}">${o.payment&&o.payment.status==='paid'?'✓ Paid online · '+esc(o.payment.rzpPaymentId||''):'Cash on delivery'}</small><select data-oid="${o.id}" style="margin-top:6px">${['placed','packed','shipped','delivered','cancelled'].map(s=>`<option${s===o.status?' selected':''}>${s}</option>`).join('')}</select><input data-note="${o.id}" maxlength="140" placeholder="Tracking note, e.g. Reached Chennai hub" style="margin-top:6px"><button class="btn s" data-upd="${o.id}" style="margin-top:6px">Update tracking</button> <button class="btn o s" data-print="${o.id}" style="margin-top:6px">🖨 Print label</button>${shipBox(o)}</div></div>`}).join('')||'<p>No orders yet.</p>';
+}
+$('olist').onclick=async e=>{
+  const pid=e.target.dataset.print;if(pid){printLabel(pid);return}
+  const sid=e.target.dataset.saveship;
+  if(sid){
+    const v=document.querySelector(`input[data-ship="${sid}"]`).value;
+    if(v===''||Number(v)<0){toast('Enter a valid shipping amount');return}
+    try{const o=await api('/api/orders/'+sid,'PATCH',{shipping:Number(v)});toast('Shipping saved · new total '+inr(o.total));loadOrders()}catch(x){toast(x.message)}
+    return;
+  }
+  const id=e.target.dataset.upd;if(!id)return;
+  const status=document.querySelector(`select[data-oid="${id}"]`).value,note=document.querySelector(`input[data-note="${id}"]`).value;
+  try{await api('/api/orders/'+id,'PATCH',{status,note});toast('Tracking updated');loadOrders()}catch(x){toast(x.message)}
+};
+
+/* Pre-bookings */
+let PB=[];
+const dt=d=>d?new Date(d).toLocaleDateString('en-IN'):'-';
+async function loadPrebooks(){
+  PB=await api('/api/prebooks');
+  $('pbcount').textContent=PB.length;
+  const g={};
+  PB.forEach(b=>{const x=g[b.productId]||(g[b.productId]={id:b.productId,name:b.productName,soon:b.soon,n:0,qty:0,wait:0});x.n++;x.qty+=b.qty;if(!b.notifiedAt)x.wait++});
+  $('pbsum').innerHTML=Object.values(g).map(x=>`<tr><td>${esc(x.name)}</td><td>${x.n}</td><td>${x.qty}</td><td>${x.soon?'<span class="chip soon">Coming soon · waiting</span>':(x.wait?`<span class="chip nw">Arrived · ${x.wait} not notified</span>`:'<span class="chip" style="background:#e3f8ea;color:#14803c">All notified</span>')}</td><td>${!x.soon&&x.wait?`<button class="btn s" data-pbn="${x.id}">🔔 Notify ${x.wait}</button>`:''}</td></tr>`).join('')||'<tr><td colspan="5" style="color:var(--mute)">No pre-bookings yet.</td></tr>';
+  $('pblist').innerHTML=PB.map(b=>`<tr><td>${esc(b.name)}</td><td>${esc(b.phone||'-')}</td><td>${esc(b.email)}</td><td>${esc(b.productName)}</td><td>${b.qty}</td><td>${dt(b.createdAt)}</td><td>${b.notifiedAt?'<small style="color:#14803c">✓ Notified '+dt(b.notifiedAt)+'</small>':'<small style="color:var(--mute)">Waiting</small>'}</td><td><button class="btn o s" data-pbd="${b.id}">Delete</button></td></tr>`).join('')||'<tr><td colspan="8" style="color:var(--mute)">No pre-bookings yet.</td></tr>';
+}
+$('t-prebooks').onclick=async e=>{
+  const n=e.target.dataset.pbn,d=e.target.dataset.pbd;
+  if(n){try{const r=await api('/api/prebooks/notify/'+n,'POST');toast(r.notified+' customer(s) notified 🔔');loadPrebooks()}catch(x){toast(x.message)}}
+  if(d&&confirm('Delete this pre-booking?')){try{await api('/api/prebooks/'+d,'DELETE');toast('Deleted');loadPrebooks()}catch(x){toast(x.message)}}
+};
+$('pbcsv').onclick=()=>{
+  if(!PB.length){toast('Nothing to export');return}
+  const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  const rows=[['Customer','Phone','Email','Product','Qty','Pre-booked on','Notified on'],...PB.map(b=>[b.name,b.phone,b.email,b.productName,b.qty,dt(b.createdAt),b.notifiedAt?dt(b.notifiedAt):''])];
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.map(r=>r.map(q).join(',')).join('\n')],{type:'text/csv'}));a.download='prebookings.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+};
+
+/* Reviews (moderation) */
+async function loadReviews(){
+  const R=await api('/api/reviews');
+  $('rvlist').innerHTML=R.map(r=>`<div class="ord"><div style="flex:1;min-width:220px"><b>${esc(r.productName)}</b><br><span style="color:#FFB400">${'★'.repeat(r.rating)}</span><span style="color:var(--line)">${'★'.repeat(5-r.rating)}</span> · ${esc(r.name)}${r.verified?' · <small style="color:#2FBF71">✔ verified buyer</small>':''}<br><small>${new Date(r.createdAt).toLocaleString('en-IN')}</small>${r.text?'<br>'+esc(r.text):''}${(r.images||[]).length?`<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">${r.images.map(u=>`<a href="${esc(A(u))}" target="_blank" rel="noopener"><div class="th" style="width:60px;height:60px"><img src="${esc(A(u))}" alt=""></div></a>`).join('')}</div>`:''}</div><div><button class="btn o s" data-rvdel="${r.id}">Delete</button></div></div>`).join('')||'<p>No reviews yet.</p>';
+}
+$('rvlist').onclick=async e=>{
+  const id=e.target.dataset.rvdel;
+  if(id&&confirm('Delete this review?')){try{await api('/api/reviews/'+id,'DELETE');toast('Review deleted');loadReviews()}catch(x){toast(x.message)}}
+};
+
+/* Settings */
+async function loadSettings(){const s=await fetch(API+'/api/settings').then(r=>r.json());SK.forEach(k=>$('s_'+k).value=s[k])}
+$('ssave').onclick=async()=>{const b={};SK.forEach(k=>b[k]=$('s_'+k).value);try{await api('/api/settings','PUT',b);toast('Settings saved')}catch(e){toast(e.message)}};
+
+/* Label seller details (saved in this browser) */
+const SELLER_DEF={name:'Kimizo',addr:'',phone:'',gstin:''};
+function getSeller(){try{return Object.assign({},SELLER_DEF,JSON.parse(localStorage.getItem('kz_seller')||'{}'))}catch{return{...SELLER_DEF}}}
+function loadSeller(){const s=getSeller();$('pl_name').value=s.name;$('pl_phone').value=s.phone;$('pl_addr').value=s.addr;$('pl_gstin').value=s.gstin}
+$('plsave').onclick=()=>{
+  try{localStorage.setItem('kz_seller',JSON.stringify({name:$('pl_name').value.trim(),phone:$('pl_phone').value.trim(),addr:$('pl_addr').value.trim(),gstin:$('pl_gstin').value.trim()}));toast('Label details saved')}
+  catch{toast('Could not save in this browser')}
+};
+
+/* Print shipping label + invoice */
+const C128=['212222','222122','222221','121223','121322','131222','122213','122312','132212','221213','221312','231212','112232','122132','122231','113222','123122','123221','223211','221132','221231','213212','223112','312131','311222','321122','321221','312212','322112','322211','212123','212321','232121','111323','131123','131321','112313','132113','132311','211313','231113','231311','112133','112331','132131','113123','113321','133121','313121','211331','231131','213113','213311','213131','311123','311321','331121','312113','312311','332111','314111','221411','431111','111224','111422','121124','121421','141122','141221','112214','112412','122114','122411','142112','142211','241211','221114','413111','241112','134111','111242','121142','121241','114212','124112','124211','411212','421112','421211','212141','214121','412121','111143','111341','131141','114113','114311','411113','411311','113141','114131','311141','411131','211412','211214','211232','2331112'];
+function barcode(txt){
+  txt=String(txt).replace(/[^\x20-\x7E]/g,'');
+  const codes=[104];let sum=104;
+  [...txt].forEach((ch,i)=>{const c=ch.charCodeAt(0)-32;codes.push(c);sum+=c*(i+1)});
+  codes.push(sum%103,106);
+  let x=10,bars='';
+  codes.forEach(c=>{[...C128[c]].forEach((w,i)=>{const n=+w;if(i%2===0)bars+=`<rect x="${x}" y="0" width="${n}" height="60" fill="#000"/>`;x+=n})});
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${x+10} 60" preserveAspectRatio="none" style="width:100%;height:60px">${bars}</svg>`;
+}
+function printLabel(id){
+  const o=(window.OD||[]).find(x=>String(x.id)===String(id));if(!o)return;
+  const SELLER=getSeller(),addr=SELLER.addr||'(Settings tab-la return address add pannu)';
+  const paid=isPaid(o),d=new Date(o.createdAt).toLocaleDateString('en-IN');
+  const retHtml=esc(SELLER.name)+'<br>'+esc(addr).replace(/\n/g,'<br>')+(SELLER.phone?'<br>Ph: '+esc(SELLER.phone):'');
+  const items=o.items.map(i=>{const pr=i.price??i.p;return `<tr><td>${esc(i.name)}</td><td>${i.qty}</td><td>${pr!=null?inr(pr):'-'}</td><td>${pr!=null?inr(pr*i.qty):'-'}</td></tr>`}).join('');
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Label #${esc(o.id)}</title>
+<style>
+@page{size:A5;margin:8mm}
+*{box-sizing:border-box}
+body{font-family:Arial,sans-serif;font-size:12px;color:#000;margin:0}
+.lbl{border:2px solid #000;width:100%}
+.row{display:flex}.row>div{padding:8px;flex:1}
+.b{border-bottom:2px solid #000}.r{border-right:2px solid #000}
+h4{margin:0 0 4px;font-size:12px}
+.cod{background:#000;color:#fff;font-weight:700;padding:5px 8px;font-size:13px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th,td{border:1px solid #000;padding:4px;text-align:left}
+.big{font-size:20px;font-weight:800}
+.center{text-align:center;letter-spacing:2px;font-size:13px;font-weight:700}
+.sec{border:2px solid #000;margin-top:8px;padding:0}
+.sec>h4{padding:5px 8px;border-bottom:1px solid #000;background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.sec .in{padding:8px}
+small{font-size:10px}
+.tb{position:sticky;top:0;background:#fff8d6;border-bottom:1px solid #000;padding:8px;margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px}
+.tb button{padding:6px 14px;font-weight:700;cursor:pointer;border:1px solid #000;background:#fff;border-radius:6px}
+.edit{outline:1px dashed #999;outline-offset:2px;min-height:16px}
+.edit:focus{outline:2px solid #D8141C;background:#fffbe6}
+@media print{.tb{display:none}.edit{outline:none;background:none}}
+</style></head><body>
+<div class="tb"><button onclick="window.print()">🖨 Print</button><button onclick="saveRet()">💾 Save return address as default</button><span>Dotted box (return address) click pannina mela edit pannalaam</span></div>
+<div class="lbl">
+ <div class="row b">
+  <div class="r"><h4>Customer Address</h4><b>${esc(o.name)}</b><br>${esc(o.address).replace(/\n/g,'<br>')}<br>Ph: ${esc(o.phone)}</div>
+  <div style="padding:0">
+   <div class="cod">${paid?'PREPAID – Do not collect cash':'COD – Collect '+inr(o.total)}</div>
+   <div style="padding:8px"><div class="big">${esc(SELLER.name)}</div>
+   <div style="margin-top:6px">Order No: <b>#${esc(o.id)}</b></div>
+   <div style="margin-top:8px">${barcode('KZ'+o.id)}<div class="center">KZ${esc(o.id)}</div></div></div>
+  </div>
+ </div>
+ <div class="b" style="padding:8px"><h4>If undelivered, return to:</h4><div id="ret" class="edit" contenteditable="true">${retHtml}</div></div>
+ <div style="padding:8px"><h4>Product Details</h4>
+  <table><tr><th>Item</th><th style="width:40px">Qty</th><th style="width:110px">Order No.</th><th style="width:80px">Date</th></tr>${o.items.map(i=>`<tr><td>${esc(i.name)}</td><td>${i.qty}</td><td><b>#${esc(o.id)}</b></td><td>${d}</td></tr>`).join('')}</table>
+ </div>
+</div>
+<div class="sec"><h4>TAX INVOICE / ORDER SUMMARY</h4><div class="in">
+ <div class="row" style="padding:0;margin-bottom:8px">
+  <div style="padding:0"><b>Bill To / Ship To</b><br>${esc(o.name)}<br>${esc(o.address).replace(/\n/g,'<br>')}</div>
+  <div style="padding:0"><b>Sold by</b><br><div id="sold">${retHtml}</div>${SELLER.gstin?'GSTIN: '+esc(SELLER.gstin)+'<br>':''}Invoice date: ${d}<br>Order: #${esc(o.id)}</div>
+ </div>
+ <table><tr><th>Description</th><th>Qty</th><th>Price</th><th>Amount</th></tr>${items}
+  <tr><td colspan="3">Shipping</td><td>${inr(o.shipping||0)}</td></tr>
+  <tr><td colspan="3"><b>Total</b></td><td><b>${inr(o.total)}</b></td></tr></table>
+ <small>Payment: ${paid?'Paid online':'Cash on delivery'}. This is a computer generated invoice and does not require signature.</small>
+</div></div>
+<script>
+var retEl=document.getElementById('ret'),soldEl=document.getElementById('sold');
+retEl.addEventListener('input',function(){soldEl.innerHTML=retEl.innerHTML});
+function saveRet(){
+  try{
+    var L=retEl.innerText.split('\\n').map(function(s){return s.trim()}).filter(Boolean);
+    var ph='',rest=[];
+    L.slice(1).forEach(function(s){if(/^ph:/i.test(s))ph=s.replace(/^ph:\\s*/i,'');else rest.push(s)});
+    var ls=(window.opener&&window.opener.localStorage)||localStorage;
+    var s={};try{s=JSON.parse(ls.getItem('kz_seller')||'{}')}catch(e){}
+    s.name=L[0]||s.name||'';s.addr=rest.join('\\n');s.phone=ph;
+    ls.setItem('kz_seller',JSON.stringify(s));
+    try{if(window.opener&&window.opener.loadSeller)window.opener.loadSeller()}catch(e){}
+    alert('Return address saved. Next labels-la idhe varum.');
+  }catch(err){alert('Save aagala: '+err.message)}
+}
+<\/script>
+</body></html>`;
+  const w=window.open('','_blank');
+  if(!w){toast('Allow pop-ups to print');return}
+  w.document.write(html);w.document.close();
+}
+</script>
+</body>
+</html>

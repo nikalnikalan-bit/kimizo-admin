@@ -1,0 +1,8 @@
+{
+  "name": "kimizo-admin",
+  "version": "1.0.0",
+  "description": "Kimizo admin panel (separate site, talks to the store API)",
+  "private": true,
+  "scripts": { "start": "node dev-server.js" },
+  "dependencies": { "express": "^4.19.2" }
+}
