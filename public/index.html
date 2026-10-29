@@ -35,6 +35,8 @@ th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-a
 .ord{border-bottom:1px solid var(--line);padding:12px 0;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;font-size:14px}
 .ord small{color:var(--mute)}
 .tw{overflow-x:auto}
+.crow{display:grid;grid-template-columns:1.4fr auto 1.2fr auto;gap:8px;align-items:center;margin-bottom:8px}.crow input[type=color]{width:48px;height:40px;padding:2px;cursor:pointer}
+@media(max-width:700px){.crow{grid-template-columns:1fr auto}.crow select{grid-column:1/-1}}
 .chk{display:flex;gap:8px;align-items:center;margin:0;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font-size:14px;cursor:pointer}.chk input{width:auto}
 .chip{display:inline-block;margin:0 0 0 6px;padding:1px 8px;border-radius:99px;font-size:11px;font-weight:700;vertical-align:middle}
 .chip.soon{background:#fde9e6;color:#B5120F}.chip.nw{background:#fff1b8;color:#7a5b00}.chip.out{background:#eee;color:#555}
@@ -88,6 +90,9 @@ th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-a
       <input id="pxf" type="file" accept="image/*" multiple style="width:auto;max-width:100%">
       <div id="pxl" style="display:flex;gap:12px;flex-wrap:wrap"></div>
     </div>
+    <label>Colors (optional) – the customer has to choose one when ordering. Photo = which photo is shown when that color is chosen.</label>
+    <div id="clist"></div>
+    <button type="button" class="btn o s" id="cadd">+ Add color</button>
     <label>Product description (shown on the product page; new line = new line)</label>
     <textarea id="pd" rows="4" maxlength="2000" placeholder="Material, size, what's in the box, how to use..."></textarea>
     <p style="margin:14px 0 0"><button class="btn" id="save">Add product</button> <button class="btn o" id="cancel" hidden>Cancel edit</button></p>
@@ -153,7 +158,7 @@ th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-a
 <script>
 const API=((window.KZ&&window.KZ.API)||'').replace(/\/$/,'');          // address of the store server (set in config.js)
 const A=u=>u&&String(u).startsWith('/')?API+u:u;                          // pictures are saved as /api/img/... on the store server
-const TOKEN=localStorage.getItem('kza_token')||'';let PR=[],PX=[];
+const TOKEN=localStorage.getItem('kza_token')||'';let PR=[],PX=[],CL=[];
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const inr=n=>'₹'+Number(n).toLocaleString('en-IN');
@@ -181,7 +186,7 @@ $('tabs').onclick=e=>{
 };
 
 /* Image upload */
-function showPrev(u){$('pi').value=u||'';$('prev').hidden=!u;if(u)$('pimg').src=A(u);$('pf').value=''}
+function showPrev(u){$('pi').value=u||'';$('prev').hidden=!u;if(u)$('pimg').src=A(u);$('pf').value='';drawColors()}
 $('prm').onclick=()=>showPrev('');
 /* Convert ANY image the browser can open (PNG, JPG, WEBP, AVIF, GIF, BMP, SVG, HEIC on iPhone/Safari...) to a small WEBP (max 1000px, ~300 KB) before upload */
 async function prepImage(f){
@@ -222,7 +227,7 @@ async function uploadImg(f){
   return d.url;
 }
 /* Extra photos (gallery) */
-function drawPX(){$('pxl').innerHTML=PX.map((u,i)=>`<div style="position:relative"><div class="th" style="width:60px;height:60px"><img src="${esc(A(u))}" alt=""></div><button type="button" class="btn s" data-pxrm="${i}" aria-label="Remove photo" style="position:absolute;top:-8px;right:-8px;padding:0;width:22px;height:22px;border-radius:50%;line-height:1">✕</button></div>`).join('')}
+function drawPX(){drawColors();$('pxl').innerHTML=PX.map((u,i)=>`<div style="position:relative"><div class="th" style="width:60px;height:60px"><img src="${esc(A(u))}" alt=""></div><button type="button" class="btn s" data-pxrm="${i}" aria-label="Remove photo" style="position:absolute;top:-8px;right:-8px;padding:0;width:22px;height:22px;border-radius:50%;line-height:1">✕</button></div>`).join('')}
 $('pxl').onclick=e=>{const i=e.target.dataset.pxrm;if(i!==undefined){PX.splice(+i,1);drawPX()}};
 $('pxf').onchange=async()=>{
   const files=[...$('pxf').files];$('pxf').value='';
@@ -232,9 +237,20 @@ $('pxf').onchange=async()=>{
   catch(e){toast(e.message)}
 };
 
+/* Colors */
+const photoList=()=>[$('pi').value,...PX].filter(Boolean);
+function drawColors(){
+  const ph=photoList();
+  $('clist').innerHTML=CL.map((c,i)=>`<div class="crow"><input data-cn="${i}" value="${esc(c.n)}" maxlength="30" placeholder="Color name, e.g. Blue"><input type="color" data-ch="${i}" value="${esc(c.h||'#4aa3e8')}" title="Swatch color"><select data-ci="${i}"><option value="">No photo</option>${ph.map((_,j)=>`<option value="${j}"${c.i===j?' selected':''}>Show photo ${j+1}${j===0?' (main)':''}</option>`).join('')}</select><button type="button" class="btn o s" data-crm="${i}" aria-label="Remove color">✕</button></div>`).join('')||'<small style="color:var(--mute)">No colors added. Customers will order the product without choosing a color.</small>';
+}
+$('cadd').onclick=()=>{if(CL.length>=12){toast('Maximum 12 colors');return}CL.push({n:'',h:'#4aa3e8',i:null});drawColors()};
+$('clist').oninput=e=>{const t=e.target,d=t.dataset;if(d.cn!==undefined)CL[+d.cn].n=t.value;else if(d.ch!==undefined)CL[+d.ch].h=t.value};
+$('clist').onchange=e=>{const t=e.target;if(t.dataset.ci!==undefined)CL[+t.dataset.ci].i=t.value===''?null:+t.value};
+$('clist').onclick=e=>{const i=e.target.dataset.crm;if(i!==undefined){CL.splice(+i,1);drawColors()}};
+
 /* Products */
 const isNewP=p=>!p.soon&&(!!p.nw||(p.createdAt&&Date.now()-new Date(p.createdAt)<14*864e5));
-const chips=p=>(p.soon?'<span class="chip soon">Coming soon</span>':(p.stock!=null&&p.stock<=0?'<span class="chip out">Sold out</span>':''))+(isNewP(p)?'<span class="chip nw">NEW</span>':'');
+const chips=p=>(p.colors&&p.colors.length?'<span class="chip" style="background:#e8f1ff;color:#1a4f9a">🎨 '+p.colors.length+'</span>':'')+(p.soon?'<span class="chip soon">Coming soon</span>':(p.stock!=null&&p.stock<=0?'<span class="chip out">Sold out</span>':''))+(isNewP(p)?'<span class="chip nw">NEW</span>':'');
 const stockCell=p=>p.stock==null?'<small style="color:var(--mute)">not tracked</small>':(p.stock<=0?'<b style="color:#B5120F">0</b>':(p.stock<=5?'<b style="color:#c25b00">'+p.stock+' (low)</b>':String(p.stock)));
 async function loadProducts(){
   PR=await api('/api/products');
@@ -248,16 +264,16 @@ async function loadProducts(){
   $('bxNew').hidden=!nw.length;
   fill('plistNew',nw,'');fill('plist',live,'No products yet.');fill('plistSoon',soon,'No coming soon products. Tick "Coming soon" on a product to add one here.');
 }
-function resetForm(){['pid','pn','pc','ps','pp','pm','pe','psh','pi','pd'].forEach(i=>$(i).value='');$('ftitle').textContent='Add new product';$('save').textContent='Add product';$('cancel').hidden=true;showPrev('');PX=[];drawPX();$('pst').value='';$('psoon').checked=false;$('pnw').checked=false}
+function resetForm(){['pid','pn','pc','ps','pp','pm','pe','psh','pi','pd'].forEach(i=>$(i).value='');$('ftitle').textContent='Add new product';$('save').textContent='Add product';$('cancel').hidden=true;showPrev('');PX=[];drawPX();$('pst').value='';$('psoon').checked=false;$('pnw').checked=false;CL=[];drawColors()}
 $('cancel').onclick=resetForm;
 $('save').onclick=async()=>{
-  const id=$('pid').value,b={n:$('pn').value,c:$('pc').value,sub:$('ps').value,o:$('po').value,p:$('pp').value,m:$('pm').value||$('pp').value,e:$('pe').value||'📦',ship:$('psh').value,img:$('pi').value,imgs:PX,stock:$('pst').value,soon:$('psoon').checked,nw:$('pnw').checked,desc:$('pd').value};
+  const id=$('pid').value,b={n:$('pn').value,c:$('pc').value,sub:$('ps').value,o:$('po').value,p:$('pp').value,m:$('pm').value||$('pp').value,e:$('pe').value||'📦',ship:$('psh').value,img:$('pi').value,imgs:PX,colors:CL.filter(c=>c.n.trim()).map(c=>({n:c.n.trim(),h:c.h,i:c.i})),stock:$('pst').value,soon:$('psoon').checked,nw:$('pnw').checked,desc:$('pd').value};
   try{const d=await api(id?'/api/products/'+id:'/api/products',id?'PUT':'POST',b);toast(id?('Product updated'+(d&&d.notified?' · '+d.notified+' pre-booked customer'+(d.notified>1?'s':'')+' notified 🔔':'')):'Product added');resetForm();loadProducts()}
   catch(e){toast(e.message)}
 };
 $('plists').onclick=async e=>{
   const ed=e.target.dataset.edit,dl=e.target.dataset.del;
-  if(ed){const p=PR.find(x=>x.id==ed);$('pid').value=p.id;$('pn').value=p.n;$('pc').value=p.c;$('ps').value=p.sub||'';$('po').value=p.o;$('pp').value=p.p;$('pm').value=p.m;$('pe').value=p.e;$('psh').value=p.ship==null?'':p.ship;$('pd').value=p.desc||'';showPrev(p.img);PX=Array.isArray(p.imgs)?[...p.imgs]:[];drawPX();$('pst').value=p.stock==null?'':p.stock;$('psoon').checked=!!p.soon;$('pnw').checked=!!p.nw;$('ftitle').textContent='Edit product';$('save').textContent='Update product';$('cancel').hidden=false;scrollTo({top:0,behavior:'smooth'})}
+  if(ed){const p=PR.find(x=>x.id==ed);$('pid').value=p.id;$('pn').value=p.n;$('pc').value=p.c;$('ps').value=p.sub||'';$('po').value=p.o;$('pp').value=p.p;$('pm').value=p.m;$('pe').value=p.e;$('psh').value=p.ship==null?'':p.ship;$('pd').value=p.desc||'';showPrev(p.img);PX=Array.isArray(p.imgs)?[...p.imgs]:[];CL=(p.colors||[]).map(c=>({n:c.n,h:c.h||'#4aa3e8',i:c.i==null?null:c.i}));drawPX();$('pst').value=p.stock==null?'':p.stock;$('psoon').checked=!!p.soon;$('pnw').checked=!!p.nw;$('ftitle').textContent='Edit product';$('save').textContent='Update product';$('cancel').hidden=false;scrollTo({top:0,behavior:'smooth'})}
   if(dl&&confirm('Delete this product?')){try{await api('/api/products/'+dl,'DELETE');toast('Product deleted');loadProducts()}catch(x){toast(x.message)}}
 };
 
