@@ -282,7 +282,12 @@ $('plists').onclick=async e=>{
 };
 
 /* Orders */
-const isPaid=o=>o.payment&&o.payment.status==='paid';
+const isPaid=o=>o.payment&&(o.payment.status==='paid'||o.payment.status==='refunded');
+// payment line of an order: paid / refunded / refund failed (with a retry button)
+const payBox=o=>{const p=o.payment||{};
+  if(p.status==='refunded'){const r=p.refund||{};return `<small style="color:#2563eb;font-weight:700">↩ Refunded ${inr(r.amount||o.total)} · ${esc(r.id||'')}</small>`}
+  if(o.status==='cancelled'&&p.status==='paid')return `<small style="color:#E4231F;font-weight:700">⚠ Refund not done${p.refund&&p.refund.error?': '+esc(p.refund.error):''}</small><br><button class="btn s" data-refund="${o.id}" style="margin-top:4px">Retry refund ${inr(o.total)}</button>`;
+  return `<small style="color:${p.status==='paid'?'#2FBF71':'var(--mute)'}">${p.status==='paid'?'✓ Paid online · '+esc(p.rzpPaymentId||''):'Cash on delivery'}</small>`};
 const shipBox=o=>`<div style="margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);display:flex;gap:6px;align-items:center;justify-content:flex-end;flex-wrap:wrap">
   <span style="font-size:13px;color:var(--mute);white-space:nowrap">Shipping ₹</span>
   <input type="number" min="0" step="1" data-ship="${o.id}" value="${Number(o.shipping||0)}" style="width:90px"${isPaid(o)?' disabled':''}>
@@ -291,7 +296,7 @@ const shipBox=o=>`<div style="margin-top:12px;padding-top:10px;border-top:1px da
 async function loadOrders(){
   const O=await api('/api/orders');
   window.OD=O;
-  $('olist').innerHTML=O.map(o=>{const last=(o.history||[]).slice(-1)[0];return `<div class="ord"><div><b>#${o.id}</b> · ${esc(o.name)} · ${esc(o.phone)}<br><small>${esc(o.address)}</small><br><small>${o.items.map(i=>esc(i.name)+' × '+i.qty).join(', ')}</small><br><small>${new Date(o.createdAt).toLocaleString('en-IN')}</small><br><small>Last update: ${last?esc(last.note||last.status)+' · '+new Date(last.at).toLocaleString('en-IN'):'-'}</small></div><div style="text-align:right;min-width:240px"><b>${inr(o.total)}</b> <small>(shipping ${inr(o.shipping||0)})</small><br><small style="color:${o.payment&&o.payment.status==='paid'?'#2FBF71':'var(--mute)'}">${o.payment&&o.payment.status==='paid'?'✓ Paid online · '+esc(o.payment.rzpPaymentId||''):'Cash on delivery'}</small><select data-oid="${o.id}" style="margin-top:6px">${['placed','packed','shipped','delivered','cancelled'].map(s=>`<option${s===o.status?' selected':''}>${s}</option>`).join('')}</select><input data-note="${o.id}" maxlength="140" placeholder="Tracking note, e.g. Reached Chennai hub" style="margin-top:6px"><button class="btn s" data-upd="${o.id}" style="margin-top:6px">Update tracking</button> <button class="btn o s" data-print="${o.id}" style="margin-top:6px">🖨 Print label</button>${shipBox(o)}</div></div>`}).join('')||'<p>No orders yet.</p>';
+  $('olist').innerHTML=O.map(o=>{const last=(o.history||[]).slice(-1)[0];return `<div class="ord"><div><b>#${o.id}</b> · ${esc(o.name)} · ${esc(o.phone)}<br><small>${esc(o.address)}</small><br><small>${o.items.map(i=>esc(i.name)+' × '+i.qty).join(', ')}</small><br><small>${new Date(o.createdAt).toLocaleString('en-IN')}</small><br><small>Last update: ${last?esc(last.note||last.status)+' · '+new Date(last.at).toLocaleString('en-IN'):'-'}</small></div><div style="text-align:right;min-width:240px"><b>${inr(o.total)}</b> <small>(shipping ${inr(o.shipping||0)})</small><br>${payBox(o)}<select data-oid="${o.id}" style="margin-top:6px">${['placed','packed','shipped','delivered','cancelled'].map(s=>`<option${s===o.status?' selected':''}>${s}</option>`).join('')}</select><input data-note="${o.id}" maxlength="140" placeholder="Tracking note, e.g. Reached Chennai hub" style="margin-top:6px"><button class="btn s" data-upd="${o.id}" style="margin-top:6px">Update tracking</button> <button class="btn o s" data-print="${o.id}" style="margin-top:6px">🖨 Print label</button>${shipBox(o)}</div></div>`}).join('')||'<p>No orders yet.</p>';
 }
 $('olist').onclick=async e=>{
   const pid=e.target.dataset.print;if(pid){printLabel(pid);return}
@@ -302,9 +307,26 @@ $('olist').onclick=async e=>{
     try{const o=await api('/api/orders/'+sid,'PATCH',{shipping:Number(v)});toast('Shipping saved · new total '+inr(o.total));loadOrders()}catch(x){toast(x.message)}
     return;
   }
+  const rid=e.target.dataset.refund;
+  if(rid){
+    if(!confirm('Send the refund to the customer again?'))return;
+    try{await api('/api/orders/'+rid+'/refund','POST',{});toast('Refund started');loadOrders()}catch(x){alert(x.message)}
+    return;
+  }
   const id=e.target.dataset.upd;if(!id)return;
-  const status=document.querySelector(`select[data-oid="${id}"]`).value,note=document.querySelector(`input[data-note="${id}"]`).value;
-  try{await api('/api/orders/'+id,'PATCH',{status,note});toast('Tracking updated');loadOrders()}catch(x){toast(x.message)}
+  const status=document.querySelector(`select[data-oid="${id}"]`).value;let note=document.querySelector(`input[data-note="${id}"]`).value;
+  const od=(window.OD||[]).find(x=>x.id==id),paid=od&&od.payment&&od.payment.status==='paid',cancelling=status==='cancelled'&&od&&od.status!=='cancelled';
+  if(cancelling){
+    // cancelling a paid order refunds the customer automatically and sends them a message
+    const r=prompt('Cancel order #'+id+(paid?' and refund '+inr(od.total)+' to the customer automatically':'')+'.\n\nThis reason is sent to the customer:',note||'Sorry, this item is out of stock');
+    if(r===null)return;note=r.trim();
+  }
+  try{
+    const o=await api('/api/orders/'+id,'PATCH',{status,note});
+    if(o.refundError)alert('Order cancelled, but the refund FAILED:\n'+o.refundError+'\n\nUse "Retry refund" on this order, or refund it from the Razorpay dashboard.');
+    else toast(cancelling?(paid?'Cancelled · refund started · customer messaged':'Cancelled · customer messaged'):'Tracking updated');
+    loadOrders();
+  }catch(x){alert(x.message)}
 };
 
 /* Pre-bookings */
