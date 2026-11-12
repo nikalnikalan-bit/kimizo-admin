@@ -111,7 +111,7 @@ th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-a
   </div>
 </section>
 
-<section id="t-orders" hidden><div class="box"><h2>Orders</h2><div id="olist"></div></div></section>
+<section id="t-orders" hidden><div class="box"><h2>Orders</h2><div id="otools"></div><div id="olist"></div></div></section>
 
 <section id="t-prebooks" hidden>
   <div class="box tw"><h2>Pre-booking summary</h2>
@@ -293,11 +293,32 @@ const shipBox=o=>`<div style="margin-top:12px;padding-top:10px;border-top:1px da
   <input type="number" min="0" step="1" data-ship="${o.id}" value="${Number(o.shipping||0)}" style="width:90px"${isPaid(o)?' disabled':''}>
   <button class="btn o s" data-saveship="${o.id}"${isPaid(o)?' disabled':''}>Save shipping</button>
   ${isPaid(o)?'<small style="width:100%">Locked – customer already paid online</small>':''}</div>`;
+const SEL=new Set();   // ticked orders (kept when the list refreshes)
+const getCopies=()=>{const n=parseInt(localStorage.getItem('kz_copies'),10);return n===1?1:2};   // labels printed per order (default 2)
 async function loadOrders(){
   const O=await api('/api/orders');
   window.OD=O;
-  $('olist').innerHTML=O.map(o=>{const last=(o.history||[]).slice(-1)[0];return `<div class="ord"><div><b>#${o.id}</b> · ${esc(o.name)} · ${esc(o.phone)}<br><small>${esc(o.address)}</small><br><small>${o.items.map(i=>esc(i.name)+' × '+i.qty).join(', ')}</small><br><small>${new Date(o.createdAt).toLocaleString('en-IN')}</small><br><small>Last update: ${last?esc(last.note||last.status)+' · '+new Date(last.at).toLocaleString('en-IN'):'-'}</small></div><div style="text-align:right;min-width:240px"><b>${inr(o.total)}</b> <small>(shipping ${inr(o.shipping||0)})</small><br>${payBox(o)}<select data-oid="${o.id}" style="margin-top:6px">${['placed','packed','shipped','delivered','cancelled'].map(s=>`<option${s===o.status?' selected':''}>${s}</option>`).join('')}</select><input data-note="${o.id}" maxlength="140" placeholder="Tracking note, e.g. Reached Chennai hub" style="margin-top:6px"><button class="btn s" data-upd="${o.id}" style="margin-top:6px">Update tracking</button> <button class="btn o s" data-print="${o.id}" style="margin-top:6px">🖨 Print label</button>${shipBox(o)}</div></div>`}).join('')||'<p>No orders yet.</p>';
+  $('olist').innerHTML=O.map(o=>{const last=(o.history||[]).slice(-1)[0];return `<div class="ord"><div><input type="checkbox" data-sel="${o.id}"${SEL.has(String(o.id))?' checked':''} aria-label="Select order ${o.id} for label printing" style="width:auto;margin:0 8px 0 0;vertical-align:-2px;cursor:pointer"><b>#${o.id}</b> · ${esc(o.name)} · ${esc(o.phone)}<br><small>${esc(o.address)}</small><br><small>${o.items.map(i=>esc(i.name)+' × '+i.qty).join(', ')}</small><br><small>${new Date(o.createdAt).toLocaleString('en-IN')}</small><br><small>Last update: ${last?esc(last.note||last.status)+' · '+new Date(last.at).toLocaleString('en-IN'):'-'}</small></div><div style="text-align:right;min-width:240px"><b>${inr(o.total)}</b> <small>(shipping ${inr(o.shipping||0)})</small><br>${payBox(o)}<select data-oid="${o.id}" style="margin-top:6px">${['placed','packed','shipped','delivered','cancelled'].map(s=>`<option${s===o.status?' selected':''}>${s}</option>`).join('')}</select><input data-note="${o.id}" maxlength="140" placeholder="Tracking note, e.g. Reached Chennai hub" style="margin-top:6px"><button class="btn s" data-upd="${o.id}" style="margin-top:6px">Update tracking</button> <button class="btn o s" data-print="${o.id}" style="margin-top:6px">🖨 Print label</button>${shipBox(o)}</div></div>`}).join('')||'<p>No orders yet.</p>';
+  drawOtools();
 }
+// bulk label printing: tick orders, then print them 2 per A4 sheet
+function drawOtools(){
+  const n=SEL.size,c=getCopies();
+  $('otools').innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0 14px"><button class="btn o s" data-act="toship">☑ Select all to ship</button><button class="btn o s" data-act="clear">Clear</button><span style="color:var(--mute);font-size:13px;margin-left:6px">Copies per order</span><select id="copies" style="width:auto;padding:5px 8px"><option value="1"${c===1?' selected':''}>1</option><option value="2"${c===2?' selected':''}>2</option></select><button class="btn s" data-act="print"${n?'':' disabled style="opacity:.5;cursor:not-allowed"'}>🖨 Print selected (${n} order${n===1?'':'s'} · ${n*c} label${n*c===1?'':'s'})</button></div><small style="color:var(--mute);display:block;margin:-6px 0 12px">2 labels are printed on one A4 sheet. With 2 copies, every order gets its own sheet (top and bottom are the same label).</small>`;
+}
+$('otools').addEventListener('change',e=>{if(e.target.id==='copies'){localStorage.setItem('kz_copies',e.target.value);drawOtools()}});
+$('otools').onclick=e=>{
+  const a=e.target.dataset.act;if(!a)return;
+  if(a==='toship')(window.OD||[]).forEach(o=>{if(o.status==='placed'||o.status==='packed')SEL.add(String(o.id))});
+  if(a==='clear')SEL.clear();
+  if(a==='print'){if(!SEL.size)return;printLabels([...SEL]);return}
+  document.querySelectorAll('#olist [data-sel]').forEach(c=>{c.checked=SEL.has(c.dataset.sel)});
+  drawOtools();
+};
+$('olist').addEventListener('change',e=>{
+  const id=e.target.dataset&&e.target.dataset.sel;if(!id)return;
+  e.target.checked?SEL.add(id):SEL.delete(id);drawOtools();
+});
 $('olist').onclick=async e=>{
   const pid=e.target.dataset.print;if(pid){printLabel(pid);return}
   const sid=e.target.dataset.saveship;
@@ -386,16 +407,8 @@ function barcode(txt){
   codes.forEach(c=>{[...C128[c]].forEach((w,i)=>{const n=+w;if(i%2===0)bars+=`<rect x="${x}" y="0" width="${n}" height="60" fill="#000"/>`;x+=n})});
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${x+10} 60" preserveAspectRatio="none" style="width:100%;height:60px">${bars}</svg>`;
 }
-function printLabel(id){
-  const o=(window.OD||[]).find(x=>String(x.id)===String(id));if(!o)return;
-  const SELLER=getSeller(),addr=SELLER.addr||'(Settings tab-la return address add pannu)';
-  const paid=isPaid(o),d=new Date(o.createdAt).toLocaleDateString('en-IN');
-  const retHtml=esc(SELLER.name)+'<br>'+esc(addr).replace(/\n/g,'<br>')+(SELLER.phone?'<br>Ph: '+esc(SELLER.phone):'');
-  const items=o.items.map(i=>{const pr=i.price??i.p;return `<tr><td>${esc(i.name)}</td><td>${i.qty}</td><td>${pr!=null?inr(pr):'-'}</td><td>${pr!=null?inr(pr*i.qty):'-'}</td></tr>`}).join('');
-  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Label #${esc(o.id)}</title>
-<style>
-@page{size:A5;margin:8mm}
-*{box-sizing:border-box}
+function sellerHtml(S){const addr=S.addr||'(Settings tab-la return address add pannu)';return esc(S.name)+'<br>'+esc(addr).replace(/\n/g,'<br>')+(S.phone?'<br>Ph: '+esc(S.phone):'')}
+const LABEL_CSS=`*{box-sizing:border-box}
 body{font-family:Arial,sans-serif;font-size:12px;color:#000;margin:0}
 .lbl{border:2px solid #000;width:100%}
 .row{display:flex}.row>div{padding:8px;flex:1}
@@ -410,44 +423,17 @@ th,td{border:1px solid #000;padding:4px;text-align:left}
 .sec>h4{padding:5px 8px;border-bottom:1px solid #000;background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .sec .in{padding:8px}
 small{font-size:10px}
-.tb{position:sticky;top:0;background:#fff8d6;border-bottom:1px solid #000;padding:8px;margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px}
+.tb{position:sticky;top:0;background:#fff8d6;border-bottom:1px solid #000;padding:8px;margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px;z-index:5}
 .tb button{padding:6px 14px;font-weight:700;cursor:pointer;border:1px solid #000;background:#fff;border-radius:6px}
 .edit{outline:1px dashed #999;outline-offset:2px;min-height:16px}
 .edit:focus{outline:2px solid #D8141C;background:#fffbe6}
-@media print{.tb{display:none}.edit{outline:none;background:none}}
-</style></head><body>
-<div class="tb"><button onclick="window.print()">🖨 Print</button><button onclick="saveRet()">💾 Save return address as default</button><span>Dotted box (return address) click pannina mela edit pannalaam</span></div>
-<div class="lbl">
- <div class="row b">
-  <div class="r"><h4>Customer Address</h4><b>${esc(o.name)}</b><br>${esc(o.address).replace(/\n/g,'<br>')}<br>Ph: ${esc(o.phone)}</div>
-  <div style="padding:0">
-   <div class="cod">${paid?'PREPAID – Do not collect cash':'COD – Collect '+inr(o.total)}</div>
-   <div style="padding:8px"><div class="big">${esc(SELLER.name)}</div>
-   <div style="margin-top:6px">Order No: <b>#${esc(o.id)}</b></div>
-   <div style="margin-top:8px">${barcode('KZ'+o.id)}<div class="center">KZ${esc(o.id)}</div></div></div>
-  </div>
- </div>
- <div class="b" style="padding:8px"><h4>If undelivered, return to:</h4><div id="ret" class="edit" contenteditable="true">${retHtml}</div></div>
- <div style="padding:8px"><h4>Product Details</h4>
-  <table><tr><th>Item</th><th style="width:40px">Qty</th><th style="width:110px">Order No.</th><th style="width:80px">Date</th></tr>${o.items.map(i=>`<tr><td>${esc(i.name)}</td><td>${i.qty}</td><td><b>#${esc(o.id)}</b></td><td>${d}</td></tr>`).join('')}</table>
- </div>
-</div>
-<div class="sec"><h4>TAX INVOICE / ORDER SUMMARY</h4><div class="in">
- <div class="row" style="padding:0;margin-bottom:8px">
-  <div style="padding:0"><b>Bill To / Ship To</b><br>${esc(o.name)}<br>${esc(o.address).replace(/\n/g,'<br>')}</div>
-  <div style="padding:0"><b>Sold by</b><br><div id="sold">${retHtml}</div>${SELLER.gstin?'GSTIN: '+esc(SELLER.gstin)+'<br>':''}Invoice date: ${d}<br>Order: #${esc(o.id)}</div>
- </div>
- <table><tr><th>Description</th><th>Qty</th><th>Price</th><th>Amount</th></tr>${items}
-  <tr><td colspan="3">Shipping</td><td>${inr(o.shipping||0)}</td></tr>
-  <tr><td colspan="3"><b>Total</b></td><td><b>${inr(o.total)}</b></td></tr></table>
- <small>Payment: ${paid?'Paid online':'Cash on delivery'}. This is a computer generated invoice and does not require signature.</small>
-</div></div>
-<script>
-var retEl=document.getElementById('ret'),soldEl=document.getElementById('sold');
-retEl.addEventListener('input',function(){soldEl.innerHTML=retEl.innerHTML});
+@media print{.tb{display:none}.edit{outline:none;background:none}}`;
+const LABEL_JS=`<script>
+function all(q){return [].slice.call(document.querySelectorAll(q))}
+all('.ret').forEach(function(e){e.addEventListener('input',function(){var h=e.innerHTML;all('.ret').forEach(function(x){if(x!==e)x.innerHTML=h});all('.sold').forEach(function(x){x.innerHTML=h})})});
 function saveRet(){
   try{
-    var L=retEl.innerText.split('\\n').map(function(s){return s.trim()}).filter(Boolean);
+    var L=document.querySelector('.ret').innerText.split('\\n').map(function(s){return s.trim()}).filter(Boolean);
     var ph='',rest=[];
     L.slice(1).forEach(function(s){if(/^ph:/i.test(s))ph=s.replace(/^ph:\\s*/i,'');else rest.push(s)});
     var ls=(window.opener&&window.opener.localStorage)||localStorage;
@@ -458,11 +444,66 @@ function saveRet(){
     alert('Return address saved. Next labels-la idhe varum.');
   }catch(err){alert('Save aagala: '+err.message)}
 }
-<\/script>
+/* 2-per-sheet: if a label is taller than its half of the A4 sheet (many items), shrink it to fit */
+function fit(){all('.fit').forEach(function(c){var s=c.parentNode;c.style.transform='';c.style.width='';var need=c.scrollHeight,have=s.clientHeight-4;if(have>0&&need>have){var z=have/need;c.style.transformOrigin='top left';c.style.transform='scale('+z+')';c.style.width=(100/z)+'%'}})}
+window.addEventListener('load',fit);window.addEventListener('beforeprint',fit);
+<\/script>`;
+// shipping label + invoice of one order (the same design for single and 2-per-sheet printing)
+function labelBody(o,S){
+  const retHtml=sellerHtml(S),paid=isPaid(o),d=new Date(o.createdAt).toLocaleDateString('en-IN');
+  const items=o.items.map(i=>{const pr=i.price??i.p;return `<tr><td>${esc(i.name)}</td><td>${i.qty}</td><td>${pr!=null?inr(pr):'-'}</td><td>${pr!=null?inr(pr*i.qty):'-'}</td></tr>`}).join('');
+  return `<div class="lbl">
+ <div class="row b">
+  <div class="r"><h4>Customer Address</h4><b>${esc(o.name)}</b><br>${esc(o.address).replace(/\n/g,'<br>')}<br>Ph: ${esc(o.phone)}</div>
+  <div style="padding:0">
+   <div class="cod">${paid?'PREPAID – Do not collect cash':'COD – Collect '+inr(o.total)}</div>
+   <div style="padding:8px"><div class="big">${esc(S.name)}</div>
+   <div style="margin-top:6px">Order No: <b>#${esc(o.id)}</b></div>
+   <div style="margin-top:8px">${barcode('KZ'+o.id)}<div class="center">KZ${esc(o.id)}</div></div></div>
+  </div>
+ </div>
+ <div class="b" style="padding:8px"><h4>If undelivered, return to:</h4><div class="ret edit" contenteditable="true">${retHtml}</div></div>
+ <div style="padding:8px"><h4>Product Details</h4>
+  <table><tr><th>Item</th><th style="width:40px">Qty</th><th style="width:110px">Order No.</th><th style="width:80px">Date</th></tr>${o.items.map(i=>`<tr><td>${esc(i.name)}</td><td>${i.qty}</td><td><b>#${esc(o.id)}</b></td><td>${d}</td></tr>`).join('')}</table>
+ </div>
+</div>
+<div class="sec"><h4>TAX INVOICE / ORDER SUMMARY</h4><div class="in">
+ <div class="row" style="padding:0;margin-bottom:8px">
+  <div style="padding:0"><b>Bill To / Ship To</b><br>${esc(o.name)}<br>${esc(o.address).replace(/\n/g,'<br>')}</div>
+  <div style="padding:0"><b>Sold by</b><br><div class="sold">${retHtml}</div>${S.gstin?'GSTIN: '+esc(S.gstin)+'<br>':''}Invoice date: ${d}<br>Order: #${esc(o.id)}</div>
+ </div>
+ <table><tr><th>Description</th><th>Qty</th><th>Price</th><th>Amount</th></tr>${items}
+  <tr><td colspan="3">Shipping</td><td>${inr(o.shipping||0)}</td></tr>
+  <tr><td colspan="3"><b>Total</b></td><td><b>${inr(o.total)}</b></td></tr></table>
+ <small>Payment: ${paid?'Paid online':'Cash on delivery'}. This is a computer generated invoice and does not require signature.</small>
+</div></div>`;
+}
+function openLabelWindow(title,pageCss,body){
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
+<style>${LABEL_CSS}
+${pageCss}</style></head><body>
+<div class="tb"><button onclick="window.print()">🖨 Print</button><button onclick="saveRet()">💾 Save return address as default</button><span>Dotted box (return address) click pannina mela edit pannalaam</span></div>
+${body}
+${LABEL_JS}
 </body></html>`;
   const w=window.open('','_blank');
   if(!w){toast('Allow pop-ups to print');return}
   w.document.write(html);w.document.close();
+}
+// one order, one A5 page (as before)
+function printLabel(id){
+  const o=(window.OD||[]).find(x=>String(x.id)===String(id));if(!o)return;
+  if(getCopies()===2){printLabels([id]);return}   // 2 copies: one A4 sheet with the same label twice
+  openLabelWindow('Label #'+o.id,'@page{size:A5;margin:8mm}',labelBody(o,getSeller()));
+}
+// 2 labels on every A4 sheet with a dashed cut line between them (copies per order: 2 = same label twice, 1 = two different orders)
+function printLabels(ids){
+  const S=getSeller(),c=getCopies(),found=ids.map(id=>(window.OD||[]).find(x=>String(x.id)===String(id))).filter(o=>o&&o.status!=='cancelled');
+  if(!found.length){toast('Select at least one order (cancelled orders are skipped)');return}
+  const L=[];found.forEach(o=>{for(let k=0;k<c;k++)L.push(o)});   // each order is repeated `copies` times
+  let sheets='';
+  for(let i=0;i<L.length;i+=2)sheets+='<div class="sheet">'+L.slice(i,i+2).map(o=>`<div class="slot"><div class="fit">${labelBody(o,S)}</div></div>`).join('')+'</div>';
+  openLabelWindow(L.length+' labels','@page{size:A4;margin:6mm}.sheet{height:283mm;display:flex;flex-direction:column;break-after:page;page-break-after:always}.sheet:last-child{break-after:auto;page-break-after:auto}.slot{flex:0 0 50%;height:50%;min-height:0;overflow:hidden;padding:3mm 0}.slot:first-child{border-bottom:1px dashed #666}',sheets);
 }
 </script>
 </body>
