@@ -304,11 +304,23 @@ async function loadOrders(){
 // bulk label printing: tick orders, then print them 2 per A4 sheet
 function drawOtools(){
   const n=SEL.size,c=getCopies();
-  $('otools').innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0 14px"><button class="btn o s" data-act="toship">☑ Select all to ship</button><button class="btn o s" data-act="clear">Clear</button><span style="color:var(--mute);font-size:13px;margin-left:6px">Copies per order</span><select id="copies" style="width:auto;padding:5px 8px"><option value="1"${c===1?' selected':''}>1</option><option value="2"${c===2?' selected':''}>2</option></select><button class="btn s" data-act="print"${n?'':' disabled style="opacity:.5;cursor:not-allowed"'}>🖨 Print selected (${n} order${n===1?'':'s'} · ${n*c} label${n*c===1?'':'s'})</button></div><small style="color:var(--mute);display:block;margin:-6px 0 12px">2 labels are printed on one A4 sheet. With 2 copies, every order gets its own sheet (top and bottom are the same label).</small>`;
+  // cancelled + paid + refund not done yet (Razorpay balance too low, ...): show a warning with one button for all of them
+  const pend=(window.OD||[]).filter(o=>o.status==='cancelled'&&o.payment&&o.payment.status==='paid'),pendSum=pend.reduce((m,o)=>m+(o.total||0),0);
+  const warn=pend.length?`<div style="border:1px solid var(--red);background:rgba(228,35,31,.12);border-radius:10px;padding:10px 14px;margin:8px 0 12px"><b style="color:#ff6b6b">⚠ ${pend.length} cancelled order${pend.length>1?'s are':' is'} still waiting for a refund (${inr(pendSum)})</b><br><small style="color:var(--mute)">${pend.map(o=>'#'+o.id).join(', ')} · The refund could not be sent, usually because your Razorpay balance is too low. Add money in Razorpay (Account &amp; Settings → Credits / Balances), then press the button.</small><br><button class="btn s" data-act="refundall" style="margin-top:8px">↩ Retry all refunds</button></div>`:'';
+  $('otools').innerHTML=warn+`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0 14px"><button class="btn o s" data-act="toship">☑ Select all to ship</button><button class="btn o s" data-act="clear">Clear</button><span style="color:var(--mute);font-size:13px;margin-left:6px">Copies per order</span><select id="copies" style="width:auto;padding:5px 8px"><option value="1"${c===1?' selected':''}>1</option><option value="2"${c===2?' selected':''}>2</option></select><button class="btn s" data-act="print"${n?'':' disabled style="opacity:.5;cursor:not-allowed"'}>🖨 Print selected (${n} order${n===1?'':'s'} · ${n*c} label${n*c===1?'':'s'})</button></div><small style="color:var(--mute);display:block;margin:-6px 0 12px">2 labels are printed on one A4 sheet. With 2 copies, every order gets its own sheet (top and bottom are the same label).</small>`;
 }
 $('otools').addEventListener('change',e=>{if(e.target.id==='copies'){localStorage.setItem('kz_copies',e.target.value);drawOtools()}});
-$('otools').onclick=e=>{
+$('otools').onclick=async e=>{
   const a=e.target.dataset.act;if(!a)return;
+  if(a==='refundall'){
+    if(!confirm('Send all waiting refunds to the customers now?'))return;
+    e.target.disabled=true;e.target.textContent='Sending refunds...';
+    try{
+      const r=await api('/api/orders/refund-all','POST',{});
+      alert((r.done?r.done+' refund(s) sent. The customers were messaged.\n':'')+(r.failed.length?r.failed.length+' refund(s) FAILED:\n'+r.failed.map(f=>'#'+f.id+': '+f.error).join('\n')+'\n\nAdd more money in Razorpay and try again.':''));
+    }catch(x){alert(x.message)}
+    loadOrders();return;
+  }
   if(a==='toship')(window.OD||[]).forEach(o=>{if(o.status==='placed'||o.status==='packed')SEL.add(String(o.id))});
   if(a==='clear')SEL.clear();
   if(a==='print'){if(!SEL.size)return;printLabels([...SEL]);return}
@@ -345,6 +357,7 @@ $('olist').onclick=async e=>{
   try{
     const o=await api('/api/orders/'+id,'PATCH',{status,note});
     if(o.refundError)alert('Order cancelled, but the refund FAILED:\n'+o.refundError+'\n\nUse "Retry refund" on this order, or refund it from the Razorpay dashboard.');
+    else if(o.noticeError)alert('Order cancelled'+(paid?' and refunded':'')+', but the message to the customer could NOT be saved:\n'+o.noticeError+'\n\nOpen your store address + /api/env-check . If driveFiles.notifications is false, create an empty notifications.json (content: []) in your Google Drive folder.');
     else toast(cancelling?(paid?'Cancelled · refund started · customer messaged':'Cancelled · customer messaged'):'Tracking updated');
     loadOrders();
   }catch(x){alert(x.message)}
