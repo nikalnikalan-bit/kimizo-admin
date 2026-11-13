@@ -25,6 +25,9 @@ header a{color:var(--mute);font-size:14px}
 .tabs{display:flex;gap:6px;margin-left:auto}
 .tabs button{border:0;background:none;color:var(--ink);padding:8px 16px;border-radius:99px;cursor:pointer;font-weight:500}
 .tabs button.on{background:var(--red);color:#fff}
+.bdg{display:inline-block;min-width:20px;height:20px;line-height:20px;padding:0 6px;margin-left:6px;border-radius:99px;background:var(--red);color:#fff;font-size:12px;font-weight:700;text-align:center;vertical-align:1px}
+.tabs button.on .bdg{background:#fff;color:var(--red)}
+.bdg[hidden]{display:none}
 main{max-width:1000px;margin:20px auto;padding:0 4vw}
 .box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:18px}
 .box h2{margin:0 0 6px;font-size:18px}
@@ -54,7 +57,7 @@ th,td{text-align:left;padding:8px;border-bottom:1px solid var(--line);vertical-a
 <header>
   <span class="logo">kimizo admin</span><a href="#" id="viewstore" target="_blank" rel="noopener">View store</a>
   <div class="tabs" id="tabs">
-    <button data-t="products" class="on">Products</button><button data-t="orders">Orders</button><button data-t="reviews">Reviews</button><button data-t="prebooks">Pre-bookings</button><button data-t="settings">Settings</button><button data-t="out">Log out</button>
+    <button data-t="products" class="on">Products</button><button data-t="orders">Orders<span class="bdg" id="ob" hidden></span></button><button data-t="reviews">Reviews</button><button data-t="prebooks">Pre-bookings</button><button data-t="settings">Settings</button><button data-t="out">Log out</button>
   </div>
 </header>
 <main>
@@ -167,7 +170,7 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const inr=n=>'₹'+Number(n).toLocaleString('en-IN');
 const SK=['storeName','tagline','heroTitle','heroText','announcement','phone','email','shippingFee','freeAbove'];
-function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toast.x);toast.x=setTimeout(()=>t.hidden=true,2000)}
+function toast(m,ms){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toast.x);toast.x=setTimeout(()=>t.hidden=true,ms||2000)}
 async function api(url,method='GET',body){
   const r=await fetch(API+url,{method,headers:{'Content-Type':'application/json',Authorization:'Bearer '+TOKEN},body:body?JSON.stringify(body):undefined});
   const d=await r.json().catch(()=>({}));
@@ -177,7 +180,25 @@ async function api(url,method='GET',body){
 }
 function bye(){localStorage.removeItem('kza_token');localStorage.removeItem('kza_user');location.href='/login.html'}
 const vs=document.getElementById('viewstore');if(vs)vs.href=(window.KZ&&window.KZ.STORE)||API||'/';
-(async()=>{try{await api('/api/admin/check');$('app').hidden=false;loadProducts();loadSettings();loadSeller()}catch{bye()}})();
+(async()=>{try{await api('/api/admin/check');$('app').hidden=false;loadProducts();loadSettings();loadSeller();pollOrders();setInterval(pollOrders,30000)}catch{bye()}})();
+
+// ---- new order alert: red number on the Orders tab, a message + a short beep when a new order arrives ----
+let lastOrderId=null;
+function setBadge(n){const b=$('ob');b.textContent=n>99?'99+':n;b.hidden=!n;b.title=n+' new order'+(n===1?'':'s')+' to pack';document.title=(n?'('+n+') ':'')+'Kimizo Admin'}
+function ding(){try{const C=window.AudioContext||window.webkitAudioContext,c=new C(),o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.value=880;o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.2,c.currentTime);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+.5);o.start();o.stop(c.currentTime+.5)}catch(e){}}
+async function pollOrders(){
+  try{
+    const s=await api('/api/orders/summary');
+    setBadge(s.newOrders);
+    const id=s.latest?s.latest.id:0;
+    if(lastOrderId!==null&&id>lastOrderId){
+      toast('🛒 New order #'+id+' · '+inr(s.latest.total)+' · '+s.latest.name,8000);ding();
+      if(!$('t-orders').hidden)loadOrders();
+    }
+    lastOrderId=id;
+  }catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)pollOrders()});
 
 $('tabs').onclick=e=>{
   const t=e.target.dataset.t;if(!t)return;
@@ -300,6 +321,7 @@ async function loadOrders(){
   window.OD=O;
   $('olist').innerHTML=O.map(o=>{const last=(o.history||[]).slice(-1)[0];return `<div class="ord"><div><input type="checkbox" data-sel="${o.id}"${SEL.has(String(o.id))?' checked':''} aria-label="Select order ${o.id} for label printing" style="width:auto;margin:0 8px 0 0;vertical-align:-2px;cursor:pointer"><b>#${o.id}</b> · ${esc(o.name)} · ${esc(o.phone)}<br><small>${esc(o.address)}</small><br><small>${o.items.map(i=>esc(i.name)+' × '+i.qty).join(', ')}</small><br><small>${new Date(o.createdAt).toLocaleString('en-IN')}</small><br><small>Last update: ${last?esc(last.note||last.status)+' · '+new Date(last.at).toLocaleString('en-IN'):'-'}</small></div><div style="text-align:right;min-width:240px"><b>${inr(o.total)}</b> <small>(shipping ${inr(o.shipping||0)})</small><br>${payBox(o)}<select data-oid="${o.id}" style="margin-top:6px">${['placed','packed','shipped','delivered','cancelled'].map(s=>`<option${s===o.status?' selected':''}>${s}</option>`).join('')}</select><input data-note="${o.id}" maxlength="140" placeholder="Tracking note, e.g. Reached Chennai hub" style="margin-top:6px"><button class="btn s" data-upd="${o.id}" style="margin-top:6px">Update tracking</button> <button class="btn o s" data-print="${o.id}" style="margin-top:6px">🖨 Print label</button>${shipBox(o)}</div></div>`}).join('')||'<p>No orders yet.</p>';
   drawOtools();
+  setBadge(O.filter(o=>o.status==='placed').length);
 }
 // bulk label printing: tick orders, then print them 2 per A4 sheet
 function drawOtools(){
